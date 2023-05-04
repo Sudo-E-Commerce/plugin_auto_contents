@@ -1,0 +1,27 @@
+{
+    "name": "sudo/auto_content",
+    "description": "AutoContent Sudo package",
+    "type": "library",
+    "license": "MIT",
+    "minimum-stability": "dev",
+    "authors": [
+        {
+            "name": "Tran Dung",
+            "email": "dung.tran@sudo.vn"
+        }
+    ],
+    "require": {},
+    "autoload": {
+        "psr-4": {
+            "Sudo\\AutoContent\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Sudo\\AutoContent\\Providers\\AutoContentServiceProvider"
+            ],
+            "aliases": {}
+        }
+    }
+}

@@ -1,0 +1,12 @@
+{
+    "id": 2,
+    "name": "Auto content",
+    "namespace": "Sudo\\AutoContent\\",
+    "provider": "Sudo\\AutoContent\\Providers\\AutoContentServiceProvider",
+    "author": "Sudo Technologies",
+    "url": "https://sudo.vn",
+    "version": "1.1",
+    "core_version": "1.0",
+    "package_name": "auto_content",
+    "description": "Auto Content for post module in Sudo CMS"
+}
