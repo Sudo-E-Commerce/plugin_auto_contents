@@ -16,7 +16,7 @@ class CreateAcKeywordsTable extends Migration
         Schema::create('ac_keywords', function (Blueprint $table) {
             $table->bigIncrements('id');
             $table->string('primary_keyword')->unique();//từ khóa chính
-            $table->string('sub_keyword');//danh sách 3-10 từ khóa phụ phân cách bởi dấu phẩy ","
+            $table->string('sub_keyword')->nullable();//danh sách 3-10 từ khóa phụ phân cách bởi dấu phẩy ","
             $table->tinyInteger('status')->default(1);
             $table->timestamps();
         });

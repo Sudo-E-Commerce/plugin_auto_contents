@@ -11,7 +11,7 @@ use OpenAI;
 
 class GptController extends AdminController
 {
-	// Get content from chat gpt
+    // Get content from chat gpt
     public function getContentFromChatGPT(Request $request){
         try{
             $title = $request->title ?? '';
@@ -34,6 +34,7 @@ class GptController extends AdminController
             $current_heading = $request->title_B ?? '';
             $current_detail = $request->detail_B ?? '';
             $style_post = $request->style_post ?? '';
+           
             if(empty($title)){
                 throw new Exception('Tiêu đề không thể để trống');
             }
@@ -48,8 +49,6 @@ class GptController extends AdminController
             if(empty($outline)){
                 throw new Exception('Dàn ý không thể để trống');
             }
-            $yourApiKey = $general_ai['account_ai'] ?? '';
-            $temperature = 0.5;
             $typeHeadings = getOption('type_heading');
             $typeHeadings = collect($typeHeadings['type_heading'] ?? [])->map(function($item) {
                 return (object) $item;
@@ -60,36 +59,19 @@ class GptController extends AdminController
             if(empty($prompt)){
                 throw new Exception('Heading không thể để trống');
             }
-            if(isset($yourApiKey) && $yourApiKey != '') {
-                $client = OpenAI::client($yourApiKey);
-                $result = $client->completions()->create([
-                    'model' => 'text-davinci-003',
-                    'prompt' => $prompt,
-                    'max_tokens' => 2048,
-                    'temperature' => $temperature
-                ]);
-                $answer = ($result->choices[0] ?? (object)[])->text ?? '';
-                $answer = ltrim($answer, "\n");
-                $answer = str_replace("\n","<br>", $answer);
-                if(!$answer){
-                    throw new \Exception('Kết quả trả về trống');
-                }
+            $answer = openAiCompletion($prompt);
+            if(isset($answer) && $answer != '') {
                 return response()->json(['success' => 1, 'message' => 'Thành công', 'data' => [
                     'answer' => $answer,
                     'prompt' => $prompt,
                 ]]);
-            }else {
-                return response()->json(['success' => 2, 'message' => 'Lỗi kết nối']);
             }
             throw new Exception("Error getting data chat gpt", 1);
-
         }catch(\Exception $e){
             \Log::error($e);
             return response()->json(['success' => 0, 'message' => $e->getMessage()]);
         }
     }
-
-
     // Get content from chat gpt
     public function getRewriteContentFromChatGPT(Request $request){
         try{
@@ -110,8 +92,6 @@ class GptController extends AdminController
                 throw new Exception('Tham số type không thể để trống');
             }
             $general_ai = getOption('general_ai');
-            $yourApiKey = $general_ai['account_ai'] ?? '';
-            $temperature = 0.5;
             if($type == 'write') {
                 $prompt = '';
                 $typeWrite = getOption('type_write');
@@ -128,23 +108,9 @@ class GptController extends AdminController
             if(empty($prompt)){
                 throw new Exception('Heading không thể để trống');
             }
-            if(isset($yourApiKey) && $yourApiKey != '') {
-                $client = OpenAI::client($yourApiKey);
-                $response = $client->completions()->create([
-                    'model' => 'text-davinci-003',
-                    'prompt' => $prompt,
-                    'max_tokens' => 2048,
-                    'temperature' => $temperature
-                ]);
-                $answer = [];
-                foreach ($response->choices as $result) {
-                    $answer[] = $result->text;
-                }
-                $answer = ltrim($answer, "\n");
-                $answer = str_replace("\n","<br>", $answer);
-                if(!count($answer)){
-                    throw new \Exception('Kết quả trả về trống');
-                }
+            $type = 2;
+            $answer = openAiCompletion($prompt, $type) ?? [];
+            if(isset($answer) && count($answer)) {
                 return response()->json(['success' => 1, 'message' => 'Thành công', 'data' => [
                     'answer' => $answer,
                     'prompt' => $prompt,
@@ -163,5 +129,67 @@ class GptController extends AdminController
     public function downloadExtension()
     {
         return response()->download(public_path('vendor/core/auto_content/sudo-auto-content-extension.zip'));
+    }
+
+    public function getFirstAndLastContent(Request $request) {
+        $keyword_id = $request->keyword_id ?? 0;
+        $general_ai = getOption('general_ai');
+        $typeHeadings = getOption('type_heading');
+        $domain = $general_ai['domain'] ?? '';
+        $content_website = $general_ai['content_website'] ?? '';
+        $trademark = $general_ai['trademark'] ?? '';
+        $purpose = $general_ai['purpose'] ?? '';
+        $yourApiKey = $general_ai['account_ai'] ?? '';
+        $title = '';
+        $primary_keyword = '';
+        $secondary_keyword = '';
+        $detail = '';
+        $temperature = 0.5;
+        $prompt_foreword = $typeHeadings['type_foreword'] ?? '';
+        $prompt_end = $typeHeadings['type_end'] ?? '';
+        $answer_foreword = '';
+        $answer_end = '';
+        $ac_outline = \DB::table('ac_outlines')->where('keyword_id', $keyword_id)->first();
+        if($ac_outline){
+            $outlines = json_decode(base64_decode($ac_outline->outlines));
+            $ac_keyword = \DB::table('ac_keywords')->where('id', $keyword_id)->first();
+
+            $primary_keyword = $ac_keyword->primary_keyword;
+            $secondary_keyword = $ac_keyword->sub_keyword;
+
+            if(!is_array($outlines)){
+                $outlines = [];
+            }
+
+            foreach ($outlines as $key => $heading) {
+                if(!$title && $heading->tag == 1){
+                    $title = $heading->text;
+                }else{
+                    $detail .= "<h{$heading->tag}>{$heading->text}</h{$heading->tag}>";
+                }
+
+            }
+        }
+        if(isset($yourApiKey) && $yourApiKey != '') {
+            $client = \OpenAI::client($yourApiKey);
+            if(isset($prompt_foreword) && $prompt_foreword != '') {
+                $prompt_foreword = str_replace(['{title}', '{outline}', '{primary_keyword}', '{domain}', '{content_website}', '{trademark}', '{purpose}'], [$title, $detail, $primary_keyword,$domain, $content_website, $trademark, $purpose], $prompt_foreword);
+                $answer_foreword = openAiCompletion($prompt_foreword);
+                if(!$answer_foreword){
+                    throw new \Exception('Kết quả trả về trống');
+                }
+            }
+            if(isset($prompt_end) && $prompt_end != '') {
+                $prompt_end = str_replace(['{title}', '{outline}', '{primary_keyword}', '{domain}', '{content_website}', '{trademark}', '{purpose}'], [$title, $detail, $primary_keyword,$domain, $content_website, $trademark, $purpose], $prompt_end);
+                $answer_end = openAiCompletion($prompt_foreword);
+                if(!$answer_end){
+                    throw new \Exception('Kết quả trả về trống');
+                }
+            }
+            // dd($answer_foreword, $answer_end);
+            return response()->json(['success' => 1, 'first' => $answer_foreword, 'last' => $answer_end]);
+        }else {
+            return response()->json(['success' => 2, 'message' => 'Lỗi kết nối']);
+        }
     }
 }

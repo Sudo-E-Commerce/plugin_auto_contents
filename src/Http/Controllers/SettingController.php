@@ -11,7 +11,7 @@ class SettingController extends AdminController
 {
     function __construct() {
         parent::__construct();
-        $this->models = new \Sudo\Theme\Models\Setting;
+        $this->models = new \Sudo\Base\Models\Setting;
         $this->table_name = $this->models->getTable();
     }
 
@@ -32,6 +32,11 @@ class SettingController extends AdminController
             $form->custom('AutoContent::admin.custom.sitebar_auto', ['setting_name' => $setting_name]);
         $form->endCard();
         $form->card('col-lg-9', 'Cấu hình tư duy cho AI');
+            $model_api = [
+                1 => 'gpt-3.5-turbo',
+                2 => 'text-davinci-003',
+            ];
+            $form->select('model', $data['model'] ?? 1, 0, 'Chọn model', $model_api, 0, [], true, 'col-lg-12');
             $form->text('account_ai', $data['account_ai'] ?? '', 0, 'API tài khoản chatGPT','', true);
             $form->text('domain', $data['domain'] ?? '', 0, 'Domain','', true);
             $form->text('content_website', $data['content_website'] ?? '', 0, 'Nội dung Website','', true);

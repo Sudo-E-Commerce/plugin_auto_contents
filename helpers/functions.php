@@ -4,81 +4,67 @@
  */
 
 function getContentByKeywordId($keyword_id){
-        $general_ai = getOption('general_ai');
-        $typeHeadings = getOption('type_heading');
-        $domain = $general_ai['domain'] ?? '';
-        $content_website = $general_ai['content_website'] ?? '';
-        $trademark = $general_ai['trademark'] ?? '';
-        $purpose = $general_ai['purpose'] ?? '';
-        $yourApiKey = $general_ai['account_ai'] ?? '';
-        $title = '';
-        $primary_keyword = '';
-        $secondary_keyword = '';
-        $detail = '';
-        $temperature = 0.5;
-        $prompt_foreword = $typeHeadings['type_foreword'] ?? '';
-        $prompt_end = $typeHeadings['type_end'] ?? '';
-        $answer_foreword = '';
-        $answer_end = '';
-        $ac_outline = \DB::table('ac_outlines')->where('keyword_id', $keyword_id)->first();
-        if($ac_outline){
-            $outlines = json_decode(base64_decode($ac_outline->outlines));
-            $ac_keyword = \DB::table('ac_keywords')->where('id', $keyword_id)->first();
+    $title = '';
+    $primary_keyword = '';
+    $secondary_keyword = '';
+    $detail = '';
+    $ac_outline = \DB::table('ac_outlines')->where('keyword_id', $keyword_id)->first();
+    if($ac_outline){
+        $outlines = json_decode(base64_decode($ac_outline->outlines));
+        $ac_keyword = \DB::table('ac_keywords')->where('id', $keyword_id)->first();
 
-            $primary_keyword = $ac_keyword->primary_keyword;
-            $secondary_keyword = $ac_keyword->sub_keyword;
+        $primary_keyword = $ac_keyword->primary_keyword;
+        $secondary_keyword = $ac_keyword->sub_keyword;
 
-            if(!is_array($outlines)){
-                $outlines = [];
-            }
-
-            foreach ($outlines as $key => $heading) {
-                if(!$title && $heading->tag == 1){
-                    $title = $heading->text;
-                }else{
-                    $detail .= "<h{$heading->tag}>{$heading->text}</h{$heading->tag}>";
-                }
-
-            }
+        if(!is_array($outlines)){
+            $outlines = [];
         }
-        $prompt_end = str_replace(['{title}', '{outline}', '{primary_keyword}', '{domain}', '{content_website}', '{trademark}', '{purpose}'], [$title, $detail, $primary_keyword,$domain, $content_website, $trademark, $purpose], $prompt_end);
-        if(isset($yourApiKey) && $yourApiKey != '') {
-            $client = \OpenAI::client($yourApiKey);
-            if(isset($prompt_foreword) && $prompt_foreword != '') {
-                $prompt_foreword = str_replace(['{title}', '{outline}', '{primary_keyword}', '{domain}', '{content_website}', '{trademark}', '{purpose}'], [$title, $detail, $primary_keyword,$domain, $content_website, $trademark, $purpose], $prompt_foreword);
-                $result_foreword = $client->completions()->create([
-                    'model' => 'text-davinci-003',
-                    'prompt' => $prompt_foreword,
-                    'max_tokens' => 2048,
-                    'temperature' => $temperature
-                ]);
-                $answer_foreword = ($result_foreword->choices[0] ?? (object)[])->text ?? '';
-                $answer_foreword = ltrim($answer_foreword, "\n");
-                $answer_foreword = str_replace("\n","<br>", $answer_foreword);
-                if(!$answer_foreword){
-                    throw new \Exception('Kết quả trả về trống');
-                }
+
+        foreach ($outlines as $key => $heading) {
+            if(!$title && $heading->tag == 1){
+                $title = $heading->text;
+            }else{
+                $detail .= "<h{$heading->tag}>{$heading->text}</h{$heading->tag}>";
             }
-            if(isset($prompt_end) && $prompt_end != '') {
-                $result_end = $client->completions()->create([
-                    'model' => 'text-davinci-003',
-                    'prompt' => $prompt_end,
-                    'max_tokens' => 2048,
-                    'temperature' => $temperature
-                ]);
-               
-                $answer_end = ($result_end->choices[0] ?? (object)[])->text ?? '';
-                $answer_end = ltrim($answer_end, "\n");
-                $answer_end = str_replace("\n","<br>", $answer_end);
-                if(!$answer_end){
-                    throw new \Exception('Kết quả trả về trống');
-                }
+
+        }
+    }
+    // $detail = '<h2>Mở đầu</h2>' . $detail . '<h2>Kết luận</h2>';
+    $detail = $detail;
+
+    return (object)compact('title', 'detail', 'primary_keyword', 'secondary_keyword');
+}
+function openAiCompletion($prompt,$type=1) { //type = 1: write | type = 2: rewrite
+    $generalAi = getOption('general_ai');
+    $modelAi = $generalAi['model'] ?? 1;
+    $yourApiKey = $generalAi['account_ai'] ?? '';
+    $temperature = 0.5;
+    if (isset($yourApiKey) && $yourApiKey != '') {
+        $client = OpenAI::client($yourApiKey);
+        $model = ($modelAi == 1) ? 'gpt-3.5-turbo' : 'text-davinci-003';
+        $messages = [['role' => 'user', 'content' => $prompt]];
+        $response = ($modelAi == 1)
+            ? $client->chat()->create(['model' => $model, 'messages' => $messages])
+            : $client->completions()->create(['model' => $model, 'prompt' => $prompt, 'max_tokens' => 2048, 'temperature' => $temperature]);
+        if($type == 2) {
+            $answer = [];
+            foreach ($response->choices as $result) {
+                $text = ($modelAi == 1) ? ltrim($result->message->content, "\n") : ltrim($result->text, "\n");
+                $text = str_replace("\n","<br>", $text);
+                $answer[] = $text;
             }
         }else {
-            return response()->json(['success' => 2, 'message' => 'Lỗi kết nối']);
+            $answer = ($modelAi == 1) ? (($response->choices[0] ?? (object)[])->message->content ?? '') : (($response->choices[0] ?? (object)[])->text ?? '');
+            $answer = ltrim($answer, "\n");
+            $answer = str_replace("\n","<br>", $answer);
         }
-
-        $detail = $answer_foreword . $detail . $answer_end;
-        return (object)compact('title', 'detail', 'primary_keyword', 'secondary_keyword');
+        if (empty($answer)) {
+            throw new \Exception('Kết quả trả về trống');
+        }
+        return $answer;
+    } else {
+        return response()->json(['success' => 2, 'message' => 'Lỗi kết nối']);
     }
+}
+
 

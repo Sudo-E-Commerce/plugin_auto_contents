@@ -191,7 +191,7 @@
                 <label class="control-label col-sm-2" style="text-align: left">Chọn headings</label>
                 <div class="col-sm-12">
                     <div class="table-responsive">
-                        <table class="table table-bordered table-striped headings">
+                        <table class="table table-bordered table-striped headings" id="table_heading">
                             <thead>
                                 <tr>
                                     <td class="text-center" style="width: 50px">#</td>
@@ -281,7 +281,7 @@
                 alert('Bạn phải nhập nội dung có các heading');
                 e.preventDefault();
             }
-            div_content = $('<div></div>').html(content);
+            div_content = $('<div></div>').html(`<p id="first-content"><p>${content}<p id="last-content">&nbsp<p>`);
 
             heading_tags = div_content.find('h1, h2, h3, h4, h5, h6');
 
@@ -450,6 +450,7 @@
         });
 
         // generate
+        
         $('#heading_modal_{{$field_detail}} .generate-gpt').on('click', function(){
             let yourApiKey = $('input[name="yourApiKey"]').val();
             if(!yourApiKey || yourApiKey === "") {
@@ -471,85 +472,128 @@
                 return;
             }
             loadingEffect('open', modal);
-            process = 0;
-            total_process = selected_heading_indexs.length;
-            let outline = $.map(heading_tags, (el, i)=>{
-                    return el.outerHTML;
-            }).join(' ');
             selected_heading_indexs.forEach((index, j) => {
-                let el = $(heading_tags[index]);
-                let heading = el.text();
                 let index_tr = Number(index) + 1
-                modal.find(`tbody tr:nth-child(${index_tr}) td.status`).html(`
-                    <span class="label label-warning">Đang xử lý...</span>
-                `)
-                let type = $('body').find(`#table_item_${index_tr} select.type`)[1].value || '';
-                let lenght = modal.find(`tbody tr:nth-child(${index_tr}) select.lenght`)[1].value || '';
-                let title_B = modal.find('#table_item_'+index_tr).find('.title_b p').text();
-                let detail_B = $('body').find(`#table_item_${index_tr} .title_b .form-control`)[1].value || '';
-                let title_A = $('body').find(`#table_item_${parseInt(index_tr - 1)} .title_b p`).text();
-                setTimeout(() => {
-                    $.ajax({
-                        headers: {
-                            'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
-                        },
-                        type: 'POST',
-                        data: {
-                            title, heading, type, outline,object,age,gender,purpose_post,style_post,lenght,title_A,title_B,detail_B,
-                            child_headings: getChildHeadings(index).join(''),
-                            primary_keyword
-                        },
+                    modal.find(`tbody tr:nth-child(${index_tr}) td.status`).html(`
+                        <span class="label label-warning">Đang xử lý...</span>
+                    `)
+            })
+            getFirstAndLastContent(function() {
+                process = 0;
+                total_process = selected_heading_indexs.length;
+                console.log(total_process);
+                let outline = $.map(heading_tags, (el, i)=>{
+                        return el.outerHTML;
+                }).join(' ');
+                selected_heading_indexs.forEach((index, j) => {
+                    let el = $(heading_tags[index]);
+                    let heading = el.text();
+                    let index_tr = Number(index) + 1
+                    // modal.find(`tbody tr:nth-child(${index_tr}) td.status`).html(`
+                    //     <span class="label label-warning">Đang xử lý...</span>
+                    // `)
+                    let type = $('body').find(`#table_item_${index_tr} select.type`)[1].value || '';
+                    let lenght = modal.find(`tbody tr:nth-child(${index_tr}) select.lenght`)[1].value || '';
+                    let title_B = modal.find('#table_item_'+index_tr).find('.title_b p').text();
+                    let detail_B = $('body').find(`#table_item_${index_tr} .title_b .form-control`)[1].value || '';
+                    let title_A = $('body').find(`#table_item_${parseInt(index_tr - 1)} .title_b p`).text();
+                    setTimeout(() => {
+                        $.ajax({
+                            headers: {
+                                'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                            },
+                            type: 'POST',
+                            data: {
+                                title, heading, type, outline,object,age,gender,purpose_post,style_post,lenght,title_A,title_B,detail_B,
+                                child_headings: getChildHeadings(index).join(''),
+                                primary_keyword
+                            },
 
-                        url: '/admin/ajax/getContentFromChatGPT',
+                            url: '/admin/ajax/getContentFromChatGPT',
 
-                        success: function (result) {
-                            if(result.success == 1){
-                                data = result.data;
-                                ans = data.answer;
-                                ans = ans.replace("\r", '').replace(new RegExp('\n+', 'g'), "</p><p>");
-                                let answer_tag = $('<p></p>').html(ans);
-                                el.after(answer_tag);
-                                editor.setData(div_content.html());
+                            success: function (result) {
+                                if(result.success == 1){
+                                    data = result.data;
+                                    ans = data.answer;
+                                    ans = ans.replace("\r", '').replace(new RegExp('\n+', 'g'), "</p><p>");
+                                    let answer_tag = $('<p></p>').html(ans);
+                                    el.after(answer_tag);
+                                    editor.setData(div_content.html());
+                                    modal.find(`tbody tr:eq(${index}) td.status`).html(`
+                                        <span class="label label-success">Thành công</span>
+                                    `)
+                                }else{
+                                    alertText(result.message, 'error');
+                                    modal.find(`tbody tr:eq(${index}) td.status`).html(`
+                                        <span class="label label-danger">Thất bại</span>
+                                    `)
+                                }
+
+                                process++;
+                                console.log(process);
+                                if(process == total_process){
+                                    console.log('Hoàn tất viết bài chatgpt');
+                                    modal.modal('hide');
+                                    loadingEffect('close', modal);
+                                }
+
+                            },
+                            error: function (error) {
+                                console.log(error);
+
+                                process++;
                                 modal.find(`tbody tr:eq(${index}) td.status`).html(`
-                                    <span class="label label-success">Thành công</span>
-                                `)
-                                console.log(data.prompt)
-                            }else{
-                                console.log(result.message);
-                                alertText(result.message, 'error');
-                                modal.find(`tbody tr:eq(${index}) td.status`).html(`
-                                    <span class="label label-danger">Thất bại</span>
-                                `)
-                            }
+                                    <span class="label label-success">Thất bại</span>
+                                `);
 
-                            process++;
-                            if(process == total_process){
-                                console.log('Hoàn tất viết bài chatgpt');
-                                modal.modal('hide');
-                                loadingEffect('close', modal);
-                            }
-
-                        },
-                        error: function (error) {
-                            console.log(error);
-
-                            process++;
-                            modal.find(`tbody tr:eq(${index}) td.status`).html(`
-                                <span class="label label-success">Thất bại</span>
-                            `);
-
-                            if(process == total_process){
-                                console.log('Hoàn tất viết bài chatgpt');
-                                modal.modal('hide');
-                                loadingEffect('close', modal);
-                            }
-                        },
-                        // async: false
-                    });
-                }, j * 1000);
+                                if(process == total_process){
+                                    console.log('Hoàn tất viết bài chatgpt');
+                                    modal.modal('hide');
+                                    loadingEffect('close', modal);
+                                }
+                            },
+                            // async: false
+                        });
+                    }, j * 1000);
+                });
             });
-
         })
+
+        function getFirstAndLastContent(callback) {
+            $.ajax({
+                headers: {
+                    'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                },
+                type: 'POST',
+                data: {keyword_id: '{{ \Request()->ac_keyword ?? 0 }}' },
+
+                url: '/admin/ajax/get-first-last-content',
+
+                success: function (result) {
+                    if(result.success == 1){
+                        let first = result.first
+                        first = first.replace("\r", '');
+                        first = first.trim();
+                        let last = result.last
+                        last = last.replace("\r", '');
+                        last = last.trim();
+                        div_content.find('#first-content').empty();
+                        div_content.find('#first-content').text(first);
+                        div_content.find('#last-content').text(last);
+                        editor.setData(div_content.html());
+                    }
+                    if (typeof callback === 'function') {
+                        callback();
+                    }
+                },
+                error: function (error) {
+                    console.log(error);
+                     if (typeof callback === 'function') {
+                        callback();
+                    }
+                },
+            });
+        }
 
         function loadingEffect(status, modal){
             if(status == 'open'){
@@ -564,7 +608,6 @@
 
         // get child heading
         function getChildHeadings(index_heading){
-            console.log(index_heading)
             let par = $(heading_tags[index_heading]);
 
             let par_lv = par.prop("tagName").replace('H');
@@ -592,6 +635,4 @@
         }
 
     });
-
-
 </script>

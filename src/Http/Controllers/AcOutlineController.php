@@ -27,7 +27,9 @@ class AcOutlineController extends AdminController
     public function outline(Request $request, $keyword_id) {
         $ac_keyword = Ackeyword::find($keyword_id);
         $ac_outline = AcOutline::where('keyword_id',$keyword_id)->first();
-        return view('AutoContent::ac_outlines.outline',compact('keyword_id','ac_keyword','ac_outline'));
+        $general_ai = getOption('general_ai');
+        $yourApiKey = $general_ai['account_ai'] ?? '';
+        return view('AutoContent::ac_outlines.outline',compact('keyword_id','ac_keyword','ac_outline', 'yourApiKey'));
     }
 
     public function save(Request $request) {

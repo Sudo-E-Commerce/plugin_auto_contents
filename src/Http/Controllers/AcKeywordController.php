@@ -16,7 +16,7 @@ class AcKeywordController extends AdminController
 {
     function __construct()
     {
-    	$this->models = new \Sudo\AutoContent\Models\Ackeyword;
+        $this->models = new \Sudo\AutoContent\Models\Ackeyword;
         $this->table_name = $this->models->getTable();
         $this->module_name = 'Auto Content Keywords';
         $this->has_seo = false;
@@ -38,13 +38,15 @@ class AcKeywordController extends AdminController
         $listdata->action('status');
         // $listdata->table_simple();
         // $listdata->no_paginate();
-        // $listdata->no_trash();
+        $listdata->no_trash();
         
         // Build bảng
         $listdata->add('primary_keyword', 'Từ khóa chính', 1);
         $listdata->add('sub_keyword', 'Từ khóa phụ', 1);
         $listdata->add('', 'Dàn ý', 0);
-        $listdata->add('', 'Hành động', 0, 'action');
+        // $listdata->add('', 'Hành động', 0, 'action');
+        $listdata->add('edit', 'Sửa', 0, 'edit');
+        $listdata->add('', 'Xóa', 0, 'delete_custom');
         
         return $listdata->render();
     }
@@ -59,7 +61,7 @@ class AcKeywordController extends AdminController
         $form = new Form;
         $form->lang($this->table_name, true);
         $form->text('primary_keyword', '', 1, 'Từ khóa chính', 'Nhập 1 từ khóa chính', true);
-        $form->text('sub_keyword', '', 1, 'Từ khóa phụ', '3-10 từ khóa phụ, phân cách bởi dấu phẩy', true);
+        $form->text('sub_keyword', '', 0, 'Từ khóa phụ', '3-10 từ khóa phụ, phân cách bởi dấu phẩy', true);
         $form->checkbox('status', 1, 1, 'Trạng thái');
         $form->action('add');
         // Hiển thị form tại view
@@ -87,12 +89,12 @@ class AcKeywordController extends AdminController
         
         //check trùng từ khóa phụ
         $validator = Validator::make($requests->all(), []);
-        $sub_keyword_explode = array_filter(explode(',',$sub_keyword));
-        if(count($sub_keyword_explode) < 3 || count($sub_keyword_explode) > 10) {
-            $validator->after(function ($validator) {
-                $validator->errors()->add('sub_keyword', 'Số lượng từ khóa phụ từ 3-10');
-            });
-        }
+        $sub_keyword_explode = array_filter(explode(',',$sub_keyword) ?? []);
+        // if(count($sub_keyword_explode) < 3 || count($sub_keyword_explode) > 10) {
+        //     $validator->after(function ($validator) {
+        //         $validator->errors()->add('sub_keyword', 'Số lượng từ khóa phụ từ 3-10');
+        //     });
+        // }
         foreach($sub_keyword_explode as $value) {
             $searchTerm = trim($value);
             if(DB::table($this->table_name)->where('sub_keyword', 'LIKE', "$searchTerm,%")->orWhere('sub_keyword', 'LIKE', "%,$searchTerm")->orWhere('sub_keyword', 'LIKE', "%,$searchTerm,%")->exists()) {
@@ -141,7 +143,7 @@ class AcKeywordController extends AdminController
         $form = new Form;
         $form->lang($this->table_name, true);
         $form->text('primary_keyword', $data_edit->primary_keyword ?? '', 1, 'Từ khóa chính', 'Nhập 1 từ khóa chính', true);
-        $form->text('sub_keyword', $data_edit->sub_keyword ?? '', 1, 'Từ khóa phụ', '3-10 từ khóa phụ, phân cách bởi dấu phẩy', true);
+        $form->text('sub_keyword', $data_edit->sub_keyword ?? '', 0, 'Từ khóa phụ', '3-10 từ khóa phụ, phân cách bởi dấu phẩy', true);
         $form->checkbox('status', $data_edit->status, 1, 'Trạng thái');
         $form->action('edit');
         return $form->render('edit_and_show', compact('id'));
@@ -170,12 +172,12 @@ class AcKeywordController extends AdminController
 
         //check trùng từ khóa phụ
         $validator = Validator::make($requests->all(), []);
-        $sub_keyword_explode = array_filter(explode(',',$sub_keyword));
-        if(count($sub_keyword_explode) < 3 || count($sub_keyword_explode) > 10) {
-            $validator->after(function ($validator) {
-                $validator->errors()->add('sub_keyword', 'Số lượng từ khóa phụ từ 3-10');
-            });
-        }
+        $sub_keyword_explode = array_filter(explode(',',$sub_keyword) ?? []);
+        // if(count($sub_keyword_explode) < 3 || count($sub_keyword_explode) > 10) {
+        //     $validator->after(function ($validator) {
+        //         $validator->errors()->add('sub_keyword', 'Số lượng từ khóa phụ từ 3-10');
+        //     });
+        // }
         foreach($sub_keyword_explode as $value) {
             $searchTerm = trim($value);
             $is_duplicate = DB::table($this->table_name)
@@ -222,18 +224,15 @@ class AcKeywordController extends AdminController
      */
     public function destroy($id)
     {
-        if($this->hasRole($this->table_name.'_delete')) {
-            $data = DB::table($this->table_name)->find($id);
-            if(!$data){
-                return response()->json(['status'=>0, 'message'=>'Không tìm thấy bản ghi']);
-            }
-
-            DB::table($this->table_name)->where('id',$id)->delete();
-            $this->systemLogs('Xóa '.$this->module_name,'delete',$this->table_name,$id);
-            return response()->json(['status'=>1,'message'=>'Xóa thành công']);
-        }else {
-            return response()->json(['status'=>0,'message'=>'Bạn không có quyền xóa']);
-        }
+        // Bản ghi cần xóa hiện tại
+        systemLogs('quick_delete', ['status' => -1], $this->table_name, $id);
+        $this->models->where('id', $id)->delete();
+        // Trả về
+        return [
+            'status' => 1,
+            'message' => __('Translate::admin.delete_success')
+        ];
+      
     }
 
     public function download() {

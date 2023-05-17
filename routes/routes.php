@@ -23,6 +23,7 @@ Route::namespace($namespace)->name('admin.')->prefix(config('app.admin_dir'))->m
 		// generate content
 		Route::post('/getContentFromChatGPT', 'GptController@getContentFromChatGPT');
 		Route::post('/getRewriteContentFromChatGPT', 'GptController@getRewriteContentFromChatGPT');
+		Route::post('get-first-last-content', 'GptController@getFirstAndLastContent');
 	});
 	Route::get('download-extension','GptController@downloadExtension')->name('download_extension');
 });

@@ -93,7 +93,7 @@ if($ac_outline) {
                 </div>
             </div>
             <div class="panel-footer flex" style="justify-content: flex-end;">
-                <a class="btn btn-primary" id="write-content-by-ai" href="{!!route('admin.posts.create')!!}?ac_keyword={{$keyword_id}}&autoContent=true"><i class="fa fa-arrow-right"></i> Viết bằng AI</a>
+                <a class="btn btn-primary" id="write-content-by-ai" data-key="{{ $yourApiKey ?? '' }}" href="{!!route('admin.posts.create')!!}?ac_keyword={{$keyword_id}}&autoContent=true"><i class="fa fa-arrow-right"></i> Viết bằng AI</a>
                 <a class="btn btn-success" style="margin-left: 15px;" id="write-content-by-ai" href="{!!route('admin.posts.create')!!}?ac_keyword={{$keyword_id}}"><i class="fa fa-arrow-right"></i> Viết thường</a>
             </div>
         </div>
@@ -101,7 +101,7 @@ if($ac_outline) {
 </div>
 @endsection
 @section('foot')
-	<script type="text/javascript" defer>
+    <script type="text/javascript" defer>
     $( function() {
         //render dữ liệu top nếu có sẵn từ db
         @if($analysis)
@@ -338,6 +338,11 @@ if($ac_outline) {
         });
         $('#write-content-by-ai').click(function(e) {
             var link = $(this).attr('href');
+            var yourApiKey = $(this).data('key');
+            if(yourApiKey.length === 0) {
+                alert('Bạn cần nhập API tài khoản chatGPT tại mục Cấu hình của Auto content để sử dụng tính năng này ');
+                return false;
+            }
             e.preventDefault();
             saveOutline(function(result, success) {
                 if (success) {
